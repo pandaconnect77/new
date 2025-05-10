@@ -6,7 +6,7 @@ const MessageSchema = new mongoose.Schema({
   image: String, // Add image field for storing Base64 string
   createdAt: {
     type: Date,
-    default: Date.now
+    default: () => Date.now() // This ensures the time is set when a new message is created
   }
 });
 
