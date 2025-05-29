@@ -58,6 +58,9 @@ io.on('connection', (socket) => {
 
   // Handle message sending
   socket.on('sendMessage', async (msg) => {
+
+
+    
     const message = new Message({
       text: msg.text,
       sender: msg.sender,
