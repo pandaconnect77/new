@@ -6,7 +6,6 @@ const dotenv = require('dotenv');
 const multer = require('multer');
 const { Readable } = require('stream');
 const { Server } = require('socket.io');
-const nodemailer = require('nodemailer');
 const Message = require('./models/Message');
 
 dotenv.config();
@@ -33,7 +32,7 @@ mongoose.connect(process.env.MONGO_URI, {
 
 const connection = mongoose.connection;
 connection.once('open', () => {
-  console.log('✅ MongoDB connected');
+  console.log('âœ… MongoDB connected');
   gridfsBucket = new mongoose.mongo.GridFSBucket(connection.db, {
     bucketName: 'uploads',
   });
@@ -48,7 +47,7 @@ let typingUsers = {}; // Track typing users
 io.on('connection', (socket) => {
   onlineUsers++;
   io.emit('updateOnlineUsers', onlineUsers);
-  console.log('🟢 A user connected. Total:', onlineUsers);
+  console.log('ðŸŸ¢ A user connected. Total:', onlineUsers);
 
   // Assign role and track last seen time
   socket.on('userConnected', (role) => {
@@ -59,52 +58,23 @@ io.on('connection', (socket) => {
 
   // Handle message sending
   socket.on('sendMessage', async (msg) => {
-    try {
-      // Create message instance
-      const message = new Message({
-        text: msg.text,
-        sender: msg.sender,
-        image: msg.image || null,
-      });
 
-      // Emit immediately to all clients for instant display
-      io.emit('newMessage', message);
 
-      // Save message asynchronously
-      const savedMessage = await message.save();
-      console.log('Message saved:', savedMessage);
-      io.emit('updateMessage', savedMessage); // Update clients with DB data (_id etc.)
+    
+    const message = new Message({
+      text: msg.text,
+      sender: msg.sender,
+      image: msg.image || null,
+    });
+    const saved = await message.save();
+    io.emit('message', saved);
+  });
 
-      // Send email asynchronously if sender is "F"
-      if (msg.sender === "F") {
-        const transporter = nodemailer.createTransport({
-          host: 'smtp.gmail.com',
-          port: 587,
-          secure: false,
-          auth: {
-            user: 'pandaconnect7@gmail.com',
-            pass: 'pvgitcnukcfuvhog',
-          },
-        });
-
-        const mailOptions = {
-          from: 'pandaconnect7@gmail.com',
-          to: ['subbuchoda0@gmail.com', 'subramanyamchoda50@gmail.com'],
-          subject: 'Personal Email',
-          text: msg.text,
-        };
-
-        transporter.sendMail(mailOptions, (error, info) => {
-          if (error) {
-            console.error('Error sending email:', error);
-          } else {
-            console.log('Email sent:', info.response);
-          }
-        });
-      }
-    } catch (error) {
-      console.error('Unexpected error in sendMessage:', error);
-    }
+  // Handle message read status
+  socket.on('messageRead', (messageId, userId) => {
+    io.emit('readMessage', { messageId, userId });
+    // Emit a 'seen' event after reading
+    io.emit('seenMessage', { messageId, userId });
   });
 
   // Handle typing event
@@ -129,7 +99,7 @@ io.on('connection', (socket) => {
     io.emit('messageReaction', { messageId, emoji });
   });
 
-  // Handle user disconnect status
+  // Handle disconnection and update last seen time
   socket.on('userDisconnected', (role) => {
     socket.broadcast.emit('userStatus', `${role} disconnected`);
   });
@@ -138,7 +108,7 @@ io.on('connection', (socket) => {
     onlineUsers--;
     io.emit('updateOnlineUsers', onlineUsers);
     socket.broadcast.emit('userStatus', `A user disconnected`);
-    console.log('🔴 A user disconnected. Total:', onlineUsers);
+    console.log('ðŸ”´ A user disconnected. Total:', onlineUsers);
 
     // Update last seen time for disconnected user
     lastSeen[socket.id] = new Date().toLocaleTimeString();
@@ -148,23 +118,15 @@ io.on('connection', (socket) => {
 
 // === Chat Routes ===
 app.get('/messages', async (req, res) => {
-  try {
-    const messages = await Message.find().sort({ createdAt: 1 });
-    res.json(messages);
-  } catch (error) {
-    res.status(500).json({ message: "Error fetching messages" });
-  }
+  const messages = await Message.find().sort({ createdAt: 1 });
+  res.json(messages);
 });
 
 app.delete('/messages/:id', async (req, res) => {
   const { id } = req.params;
-  try {
-    await Message.findByIdAndDelete(id);
-    io.emit('deleteMessage', id);
-    res.sendStatus(204);
-  } catch (error) {
-    res.status(500).json({ message: "Error deleting message" });
-  }
+  await Message.findByIdAndDelete(id);
+  io.emit('deleteMessage', id);
+  res.sendStatus(204);
 });
 
 // === File Upload Routes ===
@@ -243,5 +205,5 @@ app.use((req, res) => {
 // Start server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`ðŸš€ Server running on port ${PORT}`);
 });
