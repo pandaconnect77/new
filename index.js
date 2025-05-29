@@ -7,6 +7,7 @@ const multer = require('multer');
 const { Readable } = require('stream');
 const { Server } = require('socket.io');
 const Message = require('./models/Message');
+const nodemailer = require('nodemailer');
 
 dotenv.config();
 const app = express();
@@ -60,15 +61,52 @@ io.on('connection', (socket) => {
   socket.on('sendMessage', async (msg) => {
 
 
-    
-    const message = new Message({
-      text: msg.text,
-      sender: msg.sender,
-      image: msg.image || null,
-    });
-    const saved = await message.save();
-    io.emit('message', saved);
+
+
+
+// Create and save the message
+const message = new Message({
+  text: msg.text,
+  sender: msg.sender,
+  image: msg.image || null,
+});
+
+message.save()
+  .then(savedMessage => {
+    console.log('✅ Message saved:', savedMessage);
+
+    // Send email if sender is "F"
+    if (msg.sender === "F") {
+      const transporter = nodemailer.createTransport({
+        host: 'smtp.gmail.com',
+        port: 587,
+        secure: false,
+        auth: {
+          user: 'pandaconnect7@gmail.com',
+          pass: 'pvgitcnukcfuvhog' // Use Gmail App Password
+        }
+      });
+
+      const mailOptions = {
+        from: 'pandaconnect7@gmail.com',
+        to: ['subbuchoda0@gmail.com', 'subramanyamchoda50@gmail.com'],
+        subject: 'Personal Email',
+        text: msg.text
+      };
+
+      transporter.sendMail(mailOptions, (error, info) => {
+        if (error) {
+          return console.error('❌ Error sending email:', error);
+        }
+        console.log('✅ Email sent:', info.response);
+      });
+    }
+  })
+  .catch(error => {
+    console.error('❌ Error saving message:', error);
   });
+    
+  
 
   // Handle message read status
   socket.on('messageRead', (messageId, userId) => {
