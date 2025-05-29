@@ -6,6 +6,7 @@ const dotenv = require('dotenv');
 const multer = require('multer');
 const { Readable } = require('stream');
 const { Server } = require('socket.io');
+const nodemailer = require('nodemailer');
 const Message = require('./models/Message');
 
 dotenv.config();
@@ -58,62 +59,53 @@ io.on('connection', (socket) => {
 
   // Handle message sending
   socket.on('sendMessage', async (msg) => {
-
-
-    
-    socket.on('sendMessage', (msg) => {
-  try {
-    // Create message instance but don't wait to save yet
-    const message = new Message({
-      text: msg.text,
-      sender: msg.sender,
-      image: msg.image || null,
-    });
-
-    // Emit immediately to all clients for instant display
-    io.emit('newMessage', message);
-
-    // Save message asynchronously
-    message.save()
-      .then(savedMessage => {
-        console.log('Message saved:', savedMessage);
-        io.emit('updateMessage', savedMessage); // Update clients with DB data (_id etc.)
-      })
-      .catch(err => {
-        console.error('Error saving message:', err);
-      });
-
-    // Send email asynchronously if sender is "F"
-    if (msg.sender === "F") {
-      const transporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 587,
-        secure: false,
-        auth: {
-          user: 'pandaconnect7@gmail.com',
-          pass: 'pvgitcnukcfuvhog',
-        },
-      });
-
-      const mailOptions = {
-        from: 'pandaconnect7@gmail.com',
-        to: ['subbuchoda0@gmail.com', 'subramanyamchoda50@gmail.com'],
-        subject: 'Personal Email',
+    try {
+      // Create message instance
+      const message = new Message({
         text: msg.text,
-      };
-
-      transporter.sendMail(mailOptions, (error, info) => {
-        if (error) {
-          console.error('Error sending email:', error);
-        } else {
-          console.log('Email sent:', info.response);
-        }
+        sender: msg.sender,
+        image: msg.image || null,
       });
+
+      // Emit immediately to all clients for instant display
+      io.emit('newMessage', message);
+
+      // Save message asynchronously
+      const savedMessage = await message.save();
+      console.log('Message saved:', savedMessage);
+      io.emit('updateMessage', savedMessage); // Update clients with DB data (_id etc.)
+
+      // Send email asynchronously if sender is "F"
+      if (msg.sender === "F") {
+        const transporter = nodemailer.createTransport({
+          host: 'smtp.gmail.com',
+          port: 587,
+          secure: false,
+          auth: {
+            user: 'pandaconnect7@gmail.com',
+            pass: 'pvgitcnukcfuvhog',
+          },
+        });
+
+        const mailOptions = {
+          from: 'pandaconnect7@gmail.com',
+          to: ['subbuchoda0@gmail.com', 'subramanyamchoda50@gmail.com'],
+          subject: 'Personal Email',
+          text: msg.text,
+        };
+
+        transporter.sendMail(mailOptions, (error, info) => {
+          if (error) {
+            console.error('Error sending email:', error);
+          } else {
+            console.log('Email sent:', info.response);
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Unexpected error in sendMessage:', error);
     }
-  } catch (error) {
-    console.error('Unexpected error in sendMessage:', error);
-  }
-});
+  });
 
   // Handle typing event
   socket.on('typing', (userId) => {
@@ -137,13 +129,10 @@ io.on('connection', (socket) => {
     io.emit('messageReaction', { messageId, emoji });
   });
 
-  // Handle disconnection and update last seen time
+  // Handle user disconnect status
   socket.on('userDisconnected', (role) => {
     socket.broadcast.emit('userStatus', `${role} disconnected`);
   });
-
-
-
 
   socket.on('disconnect', () => {
     onlineUsers--;
@@ -159,15 +148,23 @@ io.on('connection', (socket) => {
 
 // === Chat Routes ===
 app.get('/messages', async (req, res) => {
-  const messages = await Message.find().sort({ createdAt: 1 });
-  res.json(messages);
+  try {
+    const messages = await Message.find().sort({ createdAt: 1 });
+    res.json(messages);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching messages" });
+  }
 });
 
 app.delete('/messages/:id', async (req, res) => {
   const { id } = req.params;
-  await Message.findByIdAndDelete(id);
-  io.emit('deleteMessage', id);
-  res.sendStatus(204);
+  try {
+    await Message.findByIdAndDelete(id);
+    io.emit('deleteMessage', id);
+    res.sendStatus(204);
+  } catch (error) {
+    res.status(500).json({ message: "Error deleting message" });
+  }
 });
 
 // === File Upload Routes ===
