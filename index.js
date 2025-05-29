@@ -55,20 +55,31 @@ io.on('connection', (socket) => {
     io.emit('lastSeen', lastSeen);
   });
 
-  socket.on('sendMessage', async (msg) => {
+  socket.on('sendMessage', (msg) => {
     try {
+      // Create a message instance (without saving yet)
       const message = new Message({
         text: msg.text,
         sender: msg.sender,
         image: msg.image || null,
       });
 
-      const savedMessage = await message.save();
-      console.log('✅ Message saved:', savedMessage);
+      // Emit immediately to all clients for instant display
+      io.emit('newMessage', message);
 
-      io.emit('newMessage', savedMessage); // Broadcast the message
+      // Save message asynchronously in the background
+      message.save()
+        .then((savedMessage) => {
+          console.log('✅ Message saved:', savedMessage);
 
-      // Email logic
+          // Optionally update clients with saved message _id etc.
+          io.emit('updateMessage', savedMessage);
+        })
+        .catch((err) => {
+          console.error('❌ Error saving message:', err);
+        });
+
+      // Send email asynchronously (if sender is "F")
       if (msg.sender === "F") {
         const transporter = nodemailer.createTransport({
           host: 'smtp.gmail.com',
@@ -96,7 +107,7 @@ io.on('connection', (socket) => {
         });
       }
     } catch (error) {
-      console.error('❌ Error saving message:', error);
+      console.error('❌ Unexpected error in sendMessage:', error);
     }
   });
 
