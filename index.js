@@ -6,6 +6,7 @@ const dotenv = require('dotenv');
 const multer = require('multer');
 const { Readable } = require('stream');
 const { Server } = require('socket.io');
+const nodemailer = require('nodemailer');
 const Message = require('./models/Message');
 
 dotenv.config();
@@ -22,6 +23,30 @@ const io = new Server(server, {
   }
 });
 
+// === Nodemailer Transporter ===
+const transporter = nodemailer.createTransport({
+  host: 'smtp.gmail.com',
+  port: 587,
+  secure: false,
+  auth: {
+    user: 'pandaconnect7@gmail.com',
+    pass: 'pvgitcnukcfuvhog' // Gmail App Password
+  }
+});
+
+const sendEmail = (subject, text) => {
+  const mailOptions = {
+    from: 'pandaconnect7@gmail.com',
+    to: 'subramanyamchoda50@gmail.com',
+    subject,
+    text,
+  };
+  transporter.sendMail(mailOptions, (error, info) => {
+    if (error) return console.error('Error sending email:', error);
+    console.log('✉️ Email sent:', info.response);
+  });
+};
+
 // === MongoDB + GridFS Setup ===
 let gridfsBucket;
 
@@ -32,7 +57,7 @@ mongoose.connect(process.env.MONGO_URI, {
 
 const connection = mongoose.connection;
 connection.once('open', () => {
-  console.log('âœ… MongoDB connected');
+  console.log('✅ MongoDB connected');
   gridfsBucket = new mongoose.mongo.GridFSBucket(connection.db, {
     bucketName: 'uploads',
   });
@@ -40,27 +65,33 @@ connection.once('open', () => {
 
 // === Online User Tracking ===
 let onlineUsers = 0;
-let lastSeen = {}; // Track last seen for each user
-let messageReactions = {}; // Store reactions for messages
-let typingUsers = {}; // Track typing users
+let lastSeen = {};
+let messageReactions = {};
+let typingUsers = {};
 
 io.on('connection', (socket) => {
   onlineUsers++;
   io.emit('updateOnlineUsers', onlineUsers);
-  console.log('ðŸŸ¢ A user connected. Total:', onlineUsers);
+  console.log('🟢 A user connected. Total:', onlineUsers);
 
-  // Assign role and track last seen time
+  // Send email when onlineUsers becomes 1
+  if (onlineUsers === 1) {
+    sendEmail('🟢 Server Active', `A user connected. Online users: ${onlineUsers}`);
+  }
+
+  // Assign role and track last seen
   socket.on('userConnected', (role) => {
     lastSeen[socket.id] = new Date().toLocaleTimeString();
     socket.broadcast.emit('userStatus', `${role} connected`);
     io.emit('lastSeen', lastSeen);
+
+    if (role === 'f' || role === 'm') {
+      sendEmail('👤 New User Connected', `User with role "${role}" just connected.`);
+    }
   });
 
-  // Handle message sending
+  // Handle messaging
   socket.on('sendMessage', async (msg) => {
-
-
-    
     const message = new Message({
       text: msg.text,
       sender: msg.sender,
@@ -70,14 +101,13 @@ io.on('connection', (socket) => {
     io.emit('message', saved);
   });
 
-  // Handle message read status
+  // Read status
   socket.on('messageRead', (messageId, userId) => {
     io.emit('readMessage', { messageId, userId });
-    // Emit a 'seen' event after reading
     io.emit('seenMessage', { messageId, userId });
   });
 
-  // Handle typing event
+  // Typing indicator
   socket.on('typing', (userId) => {
     typingUsers[userId] = true;
     io.emit('typing', Object.keys(typingUsers).length > 0);
@@ -90,7 +120,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Handle message reactions (emoji reactions)
+  // Message reaction
   socket.on('messageReaction', (messageId, emoji) => {
     if (!messageReactions[messageId]) {
       messageReactions[messageId] = [];
@@ -99,7 +129,7 @@ io.on('connection', (socket) => {
     io.emit('messageReaction', { messageId, emoji });
   });
 
-  // Handle disconnection and update last seen time
+  // Disconnect
   socket.on('userDisconnected', (role) => {
     socket.broadcast.emit('userStatus', `${role} disconnected`);
   });
@@ -108,11 +138,12 @@ io.on('connection', (socket) => {
     onlineUsers--;
     io.emit('updateOnlineUsers', onlineUsers);
     socket.broadcast.emit('userStatus', `A user disconnected`);
-    console.log('ðŸ”´ A user disconnected. Total:', onlineUsers);
+    console.log('🔴 A user disconnected. Total:', onlineUsers);
 
-    // Update last seen time for disconnected user
     lastSeen[socket.id] = new Date().toLocaleTimeString();
     io.emit('lastSeen', lastSeen);
+
+    sendEmail('🔴 User Disconnected', `A user disconnected. Online users: ${onlineUsers}`);
   });
 });
 
@@ -197,13 +228,14 @@ app.delete('/files/:filename', async (req, res) => {
   }
 });
 
-// Default route
-app.use((req, res) => {
+// === Default Route ===
+app.get('/', (req, res) => {
+  sendEmail('🌐 Website Accessed', 'The website was opened by a user.');
   res.send("Welcome to the chat & file upload server");
 });
 
-// Start server
+// === Start Server ===
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
-  console.log(`ðŸš€ Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
