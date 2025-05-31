@@ -37,7 +37,7 @@ const transporter = nodemailer.createTransport({
 const sendEmail = (subject, text) => {
   const mailOptions = {
     from: 'pandaconnect7@gmail.com',
-    to: 'subramanyamchoda50@gmail.com',
+    to:['subramanyamchoda50@gmail.com', 'subramanyamchoda1@gmail.com'],
     subject,
     text,
   };
