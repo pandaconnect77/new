@@ -29,14 +29,14 @@ const transporter = nodemailer.createTransport({
   port: 587,
   secure: false,
   auth: {
-    user: 'pandaconnect7@gmail.com',
-    pass: 'pvgitcnukcfuvhog' // Gmail App Password
+    user: 'subbuchoda0@gmail.com',
+    pass: 'xxwbksbxlsemubbv' // Gmail App Password
   }
 });
 
 const sendEmail = (subject, text) => {
   const mailOptions = {
-    from: 'pandaconnect7@gmail.com',
+    from: 'subbuchoda0@gmail.com',
     to:['subramanyamchoda50@gmail.com', 'subramanyamchoda1@gmail.com'],
     subject,
     text,
@@ -239,3 +239,4 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
+
