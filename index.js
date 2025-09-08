@@ -8,6 +8,7 @@ const { Readable } = require('stream');
 const { Server } = require('socket.io');
 const nodemailer = require('nodemailer');
 const Message = require('./models/Message');
+const Call = require('./Call');
 
 dotenv.config();
 const app = express();
@@ -234,9 +235,88 @@ app.get('/', (req, res) => {
   res.send("Welcome to the chat & file upload server");
 });
 
+
+  const onlineUsers1 = new Map();
+    
+    io.on('connection', (socket) => {
+      console.log('socket connected', socket.id);
+    
+      socket.on('register', (userId) => {
+        onlineUsers1.set(userId, socket.id);
+        socket.userId = userId;
+        console.log('registered', userId, '->', socket.id);
+      });
+    
+      // Caller sends "call-user" with payload { to, from, offer }
+      socket.on('call-user', ({ to, from, offer }) => {
+        const targetSocket = onlineUsers1.get(to);
+        if (targetSocket) {
+          io.to(targetSocket).emit('incoming-call', { from, offer });
+        } else {
+          // optionally notify caller that user is offline
+          io.to(socket.id).emit('user-offline', { to });
+        }
+      });
+    
+      // Callee accepts and sends answer
+      socket.on('accept-call', ({ to, from, answer }) => {
+        const targetSocket = onlineUsers1.get(to); // caller's socket
+        if (targetSocket) {
+          io.to(targetSocket).emit('call-accepted', { from, answer });
+        }
+      });
+    
+      // Exchange ICE candidates
+      socket.on('ice-candidate', ({ to, candidate }) => {
+        const targetSocket = onlineUsers1.get(to);
+        if (targetSocket) {
+          io.to(targetSocket).emit('ice-candidate', { candidate, from: socket.userId });
+        }
+      });
+    
+      // End call -> notify other peer
+      socket.on('end-call', ({ to, from }) => {
+        const targetSocket = onlineUsers1.get(to);
+        if (targetSocket) {
+          io.to(targetSocket).emit('call-ended', { from });
+        }
+      });
+    
+      socket.on('disconnect', () => {
+        if (socket.userId) {
+          onlineUsers1.delete(socket.userId);
+          console.log('user disconnected', socket.userId);
+        }
+      });
+    });
+    
+    // REST endpoint to save call history (client should POST when call ends)
+    app.post('/api/calls', async (req, res) => {
+      try {
+        const { callerId, receiverId, startTime, endTime, duration, status } = req.body;
+        const call = new Call({ callerId, receiverId, startTime, endTime, duration, status });
+        await call.save();
+        res.status(201).json(call);
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to save call' });
+      }
+    });
+    
+    app.get('/api/calls/:userId', async (req, res) => {
+      try {
+        const userId = req.params.userId;
+        const calls = await Call.find({ $or: [{ callerId: userId }, { receiverId: userId }] }).sort({ startTime: -1 });
+        res.json(calls);
+      } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch calls' });
+      }
+    });
+
 // === Start Server ===
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
+
 
