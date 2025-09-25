@@ -30,15 +30,16 @@ const transporter = nodemailer.createTransport({
   port: 587,
   secure: false,
   auth: {
-    user: 'subbuchoda0@gmail.com',
-    pass: 'pkjyqiryjtxjkgtk' // Gmail App Password
+    user: 'subramanyamchoda50@gmail.com',
+    pass: 'chhijfzywjwskjah' // Gmail App Password
   }
 });
 
 const sendEmail = (subject, text) => {
   const mailOptions = {
     from: 'subbuchoda0@gmail.com',
-    to:['subramanyamchoda50@gmail.com', 'subramanyamchoda1@gmail.com'],
+    // to:['subbuchoda0@gmail.com', ''subramanyamchoda1@gmail.com'],
+     to:"subramanyamchoda1@gmail.com",
     subject,
     text,
   };
@@ -308,6 +309,7 @@ server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
  
+
 
 
 
