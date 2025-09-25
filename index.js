@@ -144,7 +144,7 @@ io.on('connection', (socket) => {
     lastSeen[socket.id] = new Date().toLocaleTimeString();
     io.emit('lastSeen', lastSeen);
 
-    sendEmail('🔴 User Disconnected', `A user disconnected. Online users: ${onlineUsers}`);
+    // sendEmail('🔴 User Disconnected', `A user disconnected. Online users: ${onlineUsers}`);
   });
 });
 
@@ -307,4 +307,5 @@ server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
  
+
 
