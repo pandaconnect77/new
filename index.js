@@ -25,60 +25,29 @@ const io = new Server(server, {
 });
 
 // === Nodemailer Transporter ===
-// const transporter = nodemailer.createTransport({
-//   host: 'smtp.gmail.com',
-//   port: 587,
-//   secure: false,
-//   auth: {
-//     user: 'subbuchoda0@gmail.com',
-//     pass: 'xxwbksbxlsemubbv' // Gmail App Password
-//   }
-// });
-
-// const sendEmail = (subject, text) => {
-//   const mailOptions = {
-//     from: 'subbuchoda0@gmail.com',
-//     to:['subramanyamchoda50@gmail.com', 'subramanyamchoda1@gmail.com'],
-//     subject,
-//     text,
-//   };
-//   transporter.sendMail(mailOptions, (error, info) => {
-//     if (error) return console.error('Error sending email:', error);
-//     console.log('✉️ Email sent:', info.response);
-//   });
-// };
-
 const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,           // TLS port
-  secure: false,       // must be false for port 587
+  host: 'smtp.gmail.com',
+  port: 587,
+  secure: false,
   auth: {
-    user: "subbuchoda0@gmail.com",
-    pass: "xxwbksbxlsemubbv", // Gmail App Password
-  },
-  tls: {
-    rejectUnauthorized: false, // helps avoid self-signed cert issues
-  },
+    user: 'subbuchoda0@gmail.com',
+    pass: 'pkjyqiryjtxjkgtk' // Gmail App Password
+  }
 });
 
 const sendEmail = (subject, text) => {
   const mailOptions = {
-    from: '"Server Bot" <subbuchoda0@gmail.com>', // better to include a name
-    to: [
-      "subramanyamchoda50@gmail.com",
-      "subramanyamchoda1@gmail.com",
-    ],
+    from: 'subbuchoda0@gmail.com',
+    to:['subramanyamchoda50@gmail.com', 'subramanyamchoda1@gmail.com'],
     subject,
     text,
   };
-
   transporter.sendMail(mailOptions, (error, info) => {
-    if (error) {
-      return console.error("❌ Error sending email:", error);
-    }
-    console.log("✅ Email sent:", info.response);
+    if (error) return console.error('Error sending email:', error);
+    console.log('✉️ Email sent:', info.response);
   });
 };
+
 
 // === MongoDB + GridFS Setup ===
 let gridfsBucket;
@@ -339,6 +308,7 @@ server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
  
+
 
 
 
