@@ -25,29 +25,43 @@ const io = new Server(server, {
 });
 
 // === Nodemailer Transporter ===
+// const transporter = nodemailer.createTransport({
+//   host: 'smtp.gmail.com',
+//   port: 587,
+//   secure: false,
+//   auth: {
+//     user: 'subramanyamchoda1@gmail.com',
+//     pass: 'lsjcsrenpxxidywg' // Gmail App Password
+//   }
+// });
+
 const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
+  host: "smtp.gmail.com",
   port: 587,
-  secure: false,
+  secure: false, // use TLS
   auth: {
-    user: 'subramanyamchoda50@gmail.com',
-    pass: 'chhijfzywjwskjah' // Gmail App Password
+    user: "subramanyamchoda1@gmail.com", // must match "from"
+    pass: "lsjcsrenpxxidywg" // store in .env
   }
 });
 
 const sendEmail = (subject, text) => {
   const mailOptions = {
-    from: 'subbuchoda0@gmail.com',
-    // to:['subbuchoda0@gmail.com', ''subramanyamchoda1@gmail.com'],
-     to:"subramanyamchoda1@gmail.com",
+    from: "subramanyamchoda1@gmail.com", // must match auth.user
+    to: "subramanyamchoda50@gmail.com",
     subject,
     text,
   };
+
   transporter.sendMail(mailOptions, (error, info) => {
-    if (error) return console.error('Error sending email:', error);
-    console.log('✉️ Email sent:', info.response);
+    if (error) {
+      console.error("❌ Error sending email:", error);
+      return;
+    }
+    console.log("✉️ Email sent:", info.response);
   });
 };
+
 
 
 // === MongoDB + GridFS Setup ===
@@ -309,6 +323,7 @@ server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
  
+
 
 
 
