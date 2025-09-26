@@ -25,42 +25,36 @@ const io = new Server(server, {
 });
 
 // === Nodemailer Transporter ===
-// const transporter = nodemailer.createTransport({
-//   host: 'smtp.gmail.com',
-//   port: 587,
-//   secure: false,
-//   auth: {
-//     user: 'subramanyamchoda1@gmail.com',
-//     pass: 'lsjcsrenpxxidywg' // Gmail App Password
-//   }
-// });
 
+// Transporter setup (Gmail + App Password)
 const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false, // use TLS
+  service: "gmail", // let Nodemailer pick correct host/port
   auth: {
-    user: "subramanyamchoda1@gmail.com", // must match "from"
-    pass: "lsjcsrenpxxidywg" // store in .env
-  }
+    user: "subramanyamchoda1@gmail.com", // your Gmail
+    pass: "lsjcsrenpxxidywg",            // your Gmail App Password
+  },
 });
 
+// Function to send email
 const sendEmail = (subject, text) => {
   const mailOptions = {
-    from: "subramanyamchoda1@gmail.com", // must match auth.user
-    to: "subramanyamchoda50@gmail.com",
+    from: "subramanyamchoda1@gmail.com",   // must match auth.user
+    to: "subramanyamchoda50@gmail.com",    // recipient
     subject,
     text,
   };
 
   transporter.sendMail(mailOptions, (error, info) => {
     if (error) {
-      console.error("❌ Error sending email:", error);
+      console.error("❌ Error sending email:", error.message);
       return;
     }
     console.log("✉️ Email sent:", info.response);
   });
 };
+
+// Example test call
+
 
 
 
@@ -90,10 +84,12 @@ io.on('connection', (socket) => {
   onlineUsers++;
   io.emit('updateOnlineUsers', onlineUsers);
   console.log('🟢 A user connected. Total:', onlineUsers);
+   sendEmail('🟢 Server Active', `A user connected. Online users: ${onlineUsers}`);
 
   // Send email when onlineUsers becomes 1
-  if (onlineUsers === 1) {
+  if (onlineUsers === 1 || onlineUsers === 2) {
     sendEmail('🟢 Server Active', `A user connected. Online users: ${onlineUsers}`);
+    
   }
 
   // Assign role and track last seen
@@ -323,6 +319,7 @@ server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
  
+
 
 
 
