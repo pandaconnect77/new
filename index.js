@@ -2,13 +2,15 @@ const express = require('express');
 const http = require('http');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const dotenv = require('dotenv');
 const multer = require('multer');
 const { Readable } = require('stream');
 const { Server } = require('socket.io');
 const nodemailer = require('nodemailer');
 const Message = require('./models/Message');
-const Call = require('./Call'); // Your Call model
+const Call = require('./Call');
 
+dotenv.config();
 const app = express();
 const server = http.createServer(app);
 const upload = multer();
@@ -16,16 +18,24 @@ const upload = multer();
 app.use(cors());
 app.use(express.json());
 
+const io = new Server(server, {
+  cors: {
+    origin: '*',
+  }
+});
+
 // === Nodemailer Transporter ===
-// Replace with your Gmail and App Password
+
+// Transporter setup (Gmail + App Password)
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    user: "subbuchoda0@gmail.com", // your Gmail
-    pass: "nbykauqwedncujtn",      // your Gmail App Password
+    user: "subbuchoda0@gmail.com",       // Your Gmail
+    pass: "nbykauqwedncujtn",            // Your Gmail App Password
   },
 });
 
+// 3. Function to send email
 const sendEmail = async (subject, text, toEmail = "subramanyamchoda50@gmail.com") => {
   try {
     const mailOptions = {
@@ -42,48 +52,58 @@ const sendEmail = async (subject, text, toEmail = "subramanyamchoda50@gmail.com"
   }
 };
 
+// Example test call
+
+
+sendEmail("Test Subject", "Hello! This is a test email.");
+
 // === MongoDB + GridFS Setup ===
 let gridfsBucket;
 
-mongoose.connect("YOUR_MONGO_URI_HERE", { useNewUrlParser: true, useUnifiedTopology: true });
+mongoose.connect(process.env.MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
 
 const connection = mongoose.connection;
 connection.once('open', () => {
   console.log('✅ MongoDB connected');
-  gridfsBucket = new mongoose.mongo.GridFSBucket(connection.db, { bucketName: 'uploads' });
+  gridfsBucket = new mongoose.mongo.GridFSBucket(connection.db, {
+    bucketName: 'uploads',
+  });
 });
 
-// === Socket.io Setup ===
-const io = new Server(server, { cors: { origin: '*' } });
-
+// === Online User Tracking ===
 let onlineUsers = 0;
 let lastSeen = {};
 let messageReactions = {};
 let typingUsers = {};
-const onlineUsersMap = new Map(); // userId -> socket.id
 
 io.on('connection', (socket) => {
   onlineUsers++;
   io.emit('updateOnlineUsers', onlineUsers);
   console.log('🟢 A user connected. Total:', onlineUsers);
-  sendEmail('🟢 Server Active', `A user connected. Online users: ${onlineUsers}`);
+   sendEmail("Test Subject", "Hello! This is a test email.");
 
-  // --- User registration ---
-  socket.on('register', (userId, role) => {
-    socket.userId = userId;
-    onlineUsersMap.set(userId, socket.id);
+  // Send email when onlineUsers becomes 1
+  if (onlineUsers === 1 || onlineUsers === 2) {
+    sendEmail('🟢 Server Active', `A user connected. Online users: ${onlineUsers}`);
+    sendEmail("Test Subject", "Hello! This is a test email.");
+    
+  }
+
+  // Assign role and track last seen
+  socket.on('userConnected', (role) => {
     lastSeen[socket.id] = new Date().toLocaleTimeString();
-
-    io.emit('lastSeen', lastSeen);
     socket.broadcast.emit('userStatus', `${role} connected`);
-    io.to(socket.id).emit('registered', { userId });
+    io.emit('lastSeen', lastSeen);
 
     if (role === 'f' || role === 'm') {
       sendEmail('👤 New User Connected', `User with role "${role}" just connected.`);
     }
   });
 
-  // --- Messaging ---
+  // Handle messaging
   socket.on('sendMessage', async (msg) => {
     const message = new Message({
       text: msg.text,
@@ -94,12 +114,13 @@ io.on('connection', (socket) => {
     io.emit('message', saved);
   });
 
+  // Read status
   socket.on('messageRead', (messageId, userId) => {
     io.emit('readMessage', { messageId, userId });
     io.emit('seenMessage', { messageId, userId });
   });
 
-  // --- Typing ---
+  // Typing indicator
   socket.on('typing', (userId) => {
     typingUsers[userId] = true;
     io.emit('typing', Object.keys(typingUsers).length > 0);
@@ -107,48 +128,35 @@ io.on('connection', (socket) => {
 
   socket.on('stopTyping', (userId) => {
     delete typingUsers[userId];
-    if (Object.keys(typingUsers).length === 0) io.emit('stopTyping');
+    if (Object.keys(typingUsers).length === 0) {
+      io.emit('stopTyping');
+    }
   });
 
-  // --- Message reactions ---
+  // Message reaction
   socket.on('messageReaction', (messageId, emoji) => {
-    if (!messageReactions[messageId]) messageReactions[messageId] = [];
+    if (!messageReactions[messageId]) {
+      messageReactions[messageId] = [];
+    }
     messageReactions[messageId].push(emoji);
     io.emit('messageReaction', { messageId, emoji });
   });
 
-  // --- WebRTC / Call Handling ---
-  socket.on('call-user', ({ to, from, offer }) => {
-    const targetSocketId = onlineUsersMap.get(to);
-    if (targetSocketId) io.to(targetSocketId).emit('incoming-call', { from, offer });
-    else io.to(socket.id).emit('user-offline', { to });
+  // Disconnect
+  socket.on('userDisconnected', (role) => {
+    socket.broadcast.emit('userStatus', `${role} disconnected`);
   });
 
-  socket.on('accept-call', ({ to, from, answer }) => {
-    const targetSocketId = onlineUsersMap.get(to);
-    if (targetSocketId) io.to(targetSocketId).emit('call-accepted', { from, answer });
-  });
-
-  socket.on('ice-candidate', ({ to, candidate }) => {
-    const targetSocketId = onlineUsersMap.get(to);
-    if (targetSocketId) io.to(targetSocketId).emit('ice-candidate', { candidate, from: socket.userId });
-  });
-
-  socket.on('end-call', ({ to, from }) => {
-    const targetSocketId = onlineUsersMap.get(to);
-    if (targetSocketId) io.to(targetSocketId).emit('call-ended', { from });
-  });
-
-  // --- Disconnect ---
   socket.on('disconnect', () => {
     onlineUsers--;
     io.emit('updateOnlineUsers', onlineUsers);
     socket.broadcast.emit('userStatus', `A user disconnected`);
+    console.log('🔴 A user disconnected. Total:', onlineUsers);
+
     lastSeen[socket.id] = new Date().toLocaleTimeString();
     io.emit('lastSeen', lastSeen);
 
-    if (socket.userId) onlineUsersMap.delete(socket.userId);
-    console.log('🔴 Total users:', onlineUsers);
+    // sendEmail('🔴 User Disconnected', `A user disconnected. Online users: ${onlineUsers}`);
   });
 });
 
@@ -167,17 +175,28 @@ app.delete('/messages/:id', async (req, res) => {
 
 // === File Upload Routes ===
 app.post('/upload', upload.single('file'), async (req, res) => {
-  if (!req.file || !gridfsBucket) return res.status(400).json({ message: "No file uploaded or GridFS not initialized" });
+  if (!req.file || !gridfsBucket) {
+    return res.status(400).json({ message: "No file uploaded or GridFS not initialized" });
+  }
 
   const bufferStream = new Readable();
   bufferStream.push(req.file.buffer);
   bufferStream.push(null);
 
-  const uploadStream = gridfsBucket.openUploadStream(req.file.originalname, { contentType: req.file.mimetype });
+  const uploadStream = gridfsBucket.openUploadStream(req.file.originalname, {
+    contentType: req.file.mimetype,
+  });
+
   bufferStream.pipe(uploadStream);
 
-  uploadStream.on("finish", () => res.json({ message: "File uploaded", fileId: uploadStream.id }));
-  uploadStream.on("error", (err) => res.status(500).json({ message: "Error uploading file" }));
+  uploadStream.on("finish", () => {
+    res.json({ message: "File uploaded", fileId: uploadStream.id });
+  });
+
+  uploadStream.on("error", (err) => {
+    console.error(err);
+    res.status(500).json({ message: "Error uploading file" });
+  });
 });
 
 app.get('/files', async (req, res) => {
@@ -185,6 +204,7 @@ app.get('/files', async (req, res) => {
     const files = await gridfsBucket.find().toArray();
     res.json(files);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ message: "Error fetching files" });
   }
 });
@@ -200,8 +220,10 @@ app.get('/files/:filename', async (req, res) => {
       "Content-Disposition": `attachment; filename="${file.filename}"`,
     });
 
-    gridfsBucket.openDownloadStream(file._id).pipe(res);
+    const downloadStream = gridfsBucket.openDownloadStream(file._id);
+    downloadStream.pipe(res);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ message: "Error fetching file" });
   }
 });
@@ -214,6 +236,7 @@ app.delete('/files/:filename', async (req, res) => {
     await gridfsBucket.delete(files[0]._id);
     res.json({ message: "File deleted" });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ message: "Error deleting file" });
   }
 });
@@ -224,7 +247,6 @@ app.get('/', (req, res) => {
   res.send("Welcome to the chat & file upload server");
 });
 
-// === Start Server ===
 
  
 const onlineUsers1 = new Map(); // userId -> socket.id
@@ -297,7 +319,6 @@ server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
  
-
 
 
 
